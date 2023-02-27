@@ -1,17 +1,15 @@
 ﻿using ShegeBank.DataBase;
 
-namespace MyShegeBank.DataBase
+namespace MyShegeBank.DataBase;
+
+internal class CreateDatabase
 {
-    internal class CreateDatabase
+    Admin admin = new();
+    UserData userData = new();
+
+    public void CreateDataBase()
     {
-        Admin admin = new();
-        UserData userData = new();
-
-        public void CreateDataBase()
-        {
-            admin.CreateTables();
-            userData.InsertData();
-        }
-
+        admin.CreateDatabaseAndTables();
+        userData.InsertTableData();
     }
 }

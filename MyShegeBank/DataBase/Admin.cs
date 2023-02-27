@@ -6,117 +6,66 @@ namespace MyShegeBank.DataBase;
 internal class Admin
 {
     string connectionString = ConfigurationManager.ConnectionStrings["DATA"].ConnectionString;
+    readonly string database = "CREATE DATABASE myShegeBank";
 
-    private void CreateDatabase()
+    readonly string branch = @"CREATE TABLE branch(
+                                  Branch_Id INT PRIMARY KEY IDENTITY(1,1),
+                                  Branch_Address VARCHAR(50) NOT NULL,
+                               )";
+    readonly string customer = @"CREATE TABLE customers(
+                                    Customer_Id BIGINT PRIMARY KEY IDENTITY(1,1),
+                                    First_Name VARCHAR(30) NOT NULL,
+                                    Last_Name VARCHAR(30) NOT NULL,
+                                    Middle_Name VARCHAR(30),
+                                    Sex VARCHAR(1) NOT NULL,
+                                    Account_Number BIGINT UNIQUE,
+                                    Mobile_Number BIGINT NOT NULL,
+                                    Address VARCHAR(50) NOT NULL,
+                                    Balance DECIMAL,
+                                    Card_Number BIGINT UNIQUE,
+                                    Card_Pin INT,
+                                    Total_Login INT NOT NULL,
+                                    Is_Locked VARCHAR(5) NOT NULL,
+                                    Account_Branch_Id INT,
+                                    FOREIGN KEY (Account_Branch_Id) REFERENCES branch(Branch_Id) ON DELETE SET NULL
+                                 )";
+    readonly string transactionsTracker = @"CREATE TABLE transactionTracker(
+                                               Transaction_Id BIGINT PRIMARY KEY IDENTITY(1,1),
+                                               Customer_Id BIGINT,
+                                               Transaction_Type VARCHAR(20) NOT NULL,
+                                               Transaction_Amount DECIMAL,
+                                               Transaction_Date DATETIME NOT NULL,
+                                               Description VARCHAR(50) NOT NULL,
+                                               FOREIGN KEY (Customer_Id) REFERENCES customers(Customer_Id) ON DELETE SET NULL
+                                            )";
+    public void CreateDatabaseAndTables()
     {
-        string query = "CREATE DATABASE MYSHEGEBANK";
-
         using (SqlConnection connect = new(connectionString))
         {
             try
             {
                 connect.Open();
-                SqlCommand command = new(query, connect);
-                command.ExecuteNonQuery();
+                using (SqlCommand createDatabase = new(database, connect))
+                {
+                    createDatabase.ExecuteNonQuery();
+                }
+                using (SqlCommand createBranch = new(branch, connect))
+                {
+                    createBranch.ExecuteNonQuery();
+                }
+                using (SqlCommand createCustomer = new(customer, connect))
+                {
+                    createCustomer.ExecuteNonQuery();
+                }
+                using (SqlCommand createTransactionsTracker = new(transactionsTracker, connect))
+                {
+                    createTransactionsTracker.ExecuteNonQuery();
+                }
             }
             catch
             {
-                Console.WriteLine("Database Already Exists");
+                Console.WriteLine("Database and Tables already Exists");
             }
         }
-
-    }
-    public void CreateBankBranch()
-    {
-        string query = @"CREATE TABLE BRANCH(
-                            Branch_Id INT,
-                            Branch_Address VARCHAR(50) NOT NULL,
-                            PRIMARY KEY(Branch_Id)
-                       )";
-
-        using (SqlConnection connect = new(connectionString))
-        {
-            try
-            {
-                connect.Open();
-                SqlCommand command = new(query, connect);
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                Console.WriteLine("Table Already Exists");
-            }
-        }
-    }
-
-    public void CreateCustomersTable()
-    {
-        string query = @"CREATE TABLE CUSTOMERS(
-                            Customer_Id INT,
-                            First_Name VARCHAR(20) NOT NULL,
-                            Last_Name VARCHAR(20) NOT NULL,
-                            Middle_Name VARCHAR(20),
-                            Sex VARCHAR(1),
-                            Account_Number BIGINT UNIQUE,
-                            Mobile_Number BIGINT,
-                            Address VARCHAR(50),
-                            Balance DECIMAL,
-                            Account_Branch_Id INT,
-                            PRIMARY KEY(Customer_Id),
-                            FOREIGN KEY (Account_Branch_Id) REFERENCES BRANCH(Branch_Id) ON DELETE SET NULL
-                        )";
-
-        using (SqlConnection connect = new(connectionString))
-        {
-            try
-            {
-                connect.Open();
-                SqlCommand command = new(query, connect);
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                Console.WriteLine("Table Already Exists");
-            }
-        }
-    }
-    //MAXIMUN WITHDRAWABLE BALANCE - update check balance
-    public void CreateAtm()
-    {
-        string query = @"CREATE TABLE ATMCARD(
-                            Customer_Id INT,
-                            Full_Name VARCHAR(50) NOT NULL,
-                            Account_Number BIGINT,
-                            Card_Number BIGINT,
-                            Card_Pin INT,
-                            Mobile_Number BIGINT,
-                            Balance DECIMAL,
-                            Withdrawable_Balance DECIMAL,
-                            Is_Locked VARCHAR(5),
-                            PRIMARY KEY(Customer_Id),
-                            FOREIGN KEY (Customer_Id) REFERENCES CUSTOMERS(Customer_Id) ON DELETE CASCADE,
-                       )";
-
-        using (SqlConnection connect = new(connectionString))
-        {
-            try
-            {
-                connect.Open();
-                SqlCommand command = new(query, connect);
-                command.ExecuteNonQuery();
-            }
-            catch
-            {
-                Console.WriteLine("Table Already Exists");
-            }
-        }
-    }
-
-    public void CreateTables()
-    {
-            CreateBankBranch();
-            CreateCustomersTable();
-            CreateAtm();
-
     }
 }

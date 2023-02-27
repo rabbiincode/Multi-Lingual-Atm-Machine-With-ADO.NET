@@ -1,18 +1,21 @@
 ﻿using ConsoleTables;
-using ShegeBank.DataBase;
 using ShegeBank.Enum;
 using ShegeBank.LanguageChoice;
 using ShegeBank.Models;
 using ShegeBank.UserInterface;
 using System.Data.SqlClient;
-using System.Transactions;
 
 namespace ShegeBank.Bank;
 
 internal partial class Atm
 {
-    int transferId;
-    long selectedMobileNumber;
+    static string? receiverFirstName;
+    static string? receiverLastName;
+    static decimal receiverBalance;
+    static long receiverId;
+    static long selectedMobileNumber;
+    private readonly decimal maximumRechargeAmount = 20000;
+    private List<TransactionTracker> TransactionTrackerList = new List<TransactionTracker>();
     public void Transfer()
     {
         ValidateTransfer();
@@ -31,125 +34,112 @@ internal partial class Atm
             goto transfer;
         }
 
-        using (SqlConnection connect = new(connectionString))
+        if (transferAmount >= (accountBalance - minimumAccountBalance))
         {
-            string query = @"SELECT withdrawable_balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            decimal withdrawableBalance = (decimal)command.ExecuteScalar();
-
-            if (transferAmount >= withdrawableBalance)
-            {
-                Utility.PrintMessage($"{Languages.Display(21)}", false);
-                Utility.PressEnterToContinue();
-                return;
-            }
+            Utility.PrintMessage($"{Languages.Display(21)}", false);
+            Utility.PressEnterToContinue();
+            return;
         }
 
-        startTransfer: long accountNumber = Validate.Convert<long>($"{Languages.Display(31)}");
+        startTransfer: long receiverAccountNumber = Validate.Convert<long>($"{Languages.Display(31)}");
+
+        string query = @$"SELECT Customer_Id, First_Name, Last_Name, Balance FROM customers
+                          WHERE Account_Number = {receiverAccountNumber}";
+
+        if (myAccountNumber == receiverAccountNumber)
+        {
+            Utility.PrintMessage($"{Languages.Display(33)}", false);
+            Thread.Sleep(2000);
+            goto startTransfer;
+        }
 
         using (SqlConnection connect = new(connectionString))
         {
-            string query = @"SELECT customer_id FROM ATMCARD
-                             WHERE account_number == accountNumber";
-            try
+            using (SqlCommand command = new(query, connect))
             {
-                SqlCommand command = new(query, connect);
                 connect.Open();
-
-                transferId = (int)command.ExecuteScalar();
-            }
-            catch
-            {
-                Utility.PrintMessage($"{Languages.Display(32)}", false);
-                Thread.Sleep(2000);
-                goto startTransfer;
-            }
-
-            string myAccountNumber = @"SELECT account_number FROM ATMCARD
-                                       WHERE selectedId == customer_id";
-
-            SqlCommand number = new(myAccountNumber, connect);
-            connect.Open();
-
-            long myNumber = (int)number.ExecuteScalar();
-
-            if (accountNumber == myNumber)
-            {
-                Utility.PrintMessage($"{Languages.Display(33)}", false);
-                Thread.Sleep(2000);
-                goto startTransfer;
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        receiverId = (long)reader["Customer_Id"];
+                        receiverFirstName = (string)reader["First_Name"];
+                        receiverLastName = (string)reader["Last_Name"];
+                        receiverBalance = (decimal)reader["Balance"];
+                    }
+                    else
+                    {
+                        Utility.PrintMessage($"{Languages.Display(32)}", false);
+                        Thread.Sleep(2000);
+                        goto startTransfer;
+                    }
+                }
             }
         }
 
         Utility.Loading($"{Languages.Display(34)}", ".", 7, 500);
 
-        using (SqlConnection connect = new(connectionString))
+        Console.WriteLine($"{Languages.Display(35)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(36)} {receiverFirstName} {receiverLastName}");
+
+        question: int answer = Validate.Convert<int>($"{Languages.Display(37)}");
+
+        if (answer == 2)
+            return;
+
+        if (answer <= 0 || answer > 2)
         {
-            string query = @"SELECT full_name FROM ATMCARD
-                             WHERE account_number == accountNumber"
-            ;
-
-            SqlCommand name = new(query, connect);
-            connect.Open();
-            string fullName = (string)name.ExecuteScalar();
-
-            Console.WriteLine($"{Languages.Display(35)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(36)} {fullName}");
-
-            question: int answer = Validate.Convert<int>($"{Languages.Display(37)}");
-
-            if (answer == 2)
-                return;
-
-            if (answer <= 0 || answer > 2)
-            {
-                Utility.PrintMessage($"{Languages.Display(20)}", false);
-                goto question;
-            }
-
-            Utility.Loading($"{Languages.Display(5)}", ".", 6, 400);
-            Utility.PrintMessage($"{Languages.Display(38)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(39)} {fullName} {Languages.Display(40)}", true);
+            Utility.PrintMessage($"{Languages.Display(20)}", false);
+            goto question;
         }
 
+        Utility.Loading($"{Languages.Display(5)}", ".", 6, 400);
+
+        //update senders and reciever's balance
+        string updateBalance = @$"
+                                  UPDATE customers SET Balance -= {transferAmount} WHERE Customer_Id = {selectedId};
+                                  UPDATE customers SET Balance +''= {transferAmount} WHERE Account_Number = {receiverAccountNumber};";
+
+        //update sender and receiver's transaction history
+        string updateSender = @$"INSERT INTO transactionTracker(Customer_Id, Transaction_Type, Transaction_Amount, Transaction_Date, Description) VALUES
+                                 ({selectedId}, '{Languages.Display(89)}', {Utility.FormatCurrency(transferAmount)},
+                                 CURRENT_TIMESTAMP, '{Languages.Display(52)} {firstName} {lastName} {Languages.Display(54)}')";
+
+        string updateReceiver = @$"INSERT INTO transactionTracker(Customer_Id, Transaction_Type, Transaction_Amount, Transaction_Date, Description) VALUES
+                                   ({receiverId}, '{Languages.Display(87)}', {Utility.FormatCurrency(transferAmount)}, CURRENT_TIMESTAMP,
+                                   '{Languages.Display(53)} {receiverFirstName} {receiverLastName} {Languages.Display(54)}')";
+
         using (SqlConnection connect = new(connectionString))
         {
+            connect.Open();
             SqlTransaction transaction = connect.BeginTransaction();
+
             try
             {
-                //update senders balance
-                string senderUpdate = @"UPDATE ATMCARD
-                                        SET balance -= transferAmount 
-                                        WHERE selectedId == customer_id";
-
-                SqlCommand sender = new(senderUpdate, connect, transaction);
-                connect.Open();
-                sender.ExecuteNonQuery();
-
-                //update recievers balance
-                string recieverUpdate = @"UPDATE ATMCARD
-                                        SET balance += transferAmount 
-                                        WHERE selectedId == customer_id";
-
-                SqlCommand receiver = new(recieverUpdate, connect, transaction);
-                receiver.ExecuteNonQuery();
-                transaction.Commit();
+                using (SqlCommand command = new(updateBalance, connect, transaction))
+                {
+                    command.ExecuteNonQuery();
+                    transaction.Commit();
+                }
+                Utility.PrintMessage($"{Languages.Display(38)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(39)} {receiverFirstName} {receiverLastName} {Languages.Display(40)}", true);
             }
             catch
             {
                 transaction.Rollback();
+                Utility.PrintMessage($"{Languages.Display(91)}", false);
+                return;
+            }
+
+            using (SqlCommand command = new(updateSender, connect))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            using (SqlCommand command = new(updateReceiver, connect))
+            {
+                command.ExecuteNonQuery();
             }
         }
-
         Utility.PressEnterToContinue();
-
-        //update senders transaction history
-        //InsertTransaction(UserData.selectedAccount.Id, $"{Languages.Display(89)}", Utility.FormatCurrency(transferAmount), $"{Languages.Display(52)} {UserData.transferAccount.FullName} {Languages.Display(54)}");
-
-        //update recievers transaction history
-        //InsertTransaction(UserData.transferAccount.Id, $"{Languages.Display(87)}", Utility.FormatCurrency(transferAmount), $"{Languages.Display(53)} {UserData.selectedAccount.FullName} {Languages.Display(54)}");
     }
     public void Airtime()
     {
@@ -163,29 +153,17 @@ internal partial class Atm
         UserScreen.RechargeChoice();
         option: int airtimeOption = Validate.Convert<int>($"{Languages.Display(19)}");
 
-        using (SqlConnection connect = new(connectionString))
+        switch (airtimeOption)
         {
-            string query = @"SELECT mobile_number FROM ATMCARD
-                             WHERE selectedId == customer_id"
-            ;
-
-            SqlCommand number = new(query, connect);
-            connect.Open();
-
-            long mobileNumber = (long)number.ExecuteScalar();
-
-            switch (airtimeOption)
-            {
-                case (int)MobileChoice.Self:
-                    selectedMobileNumber = mobileNumber;
-                    break;
-                case (int)MobileChoice.Others:
-                    selectedMobileNumber = Validate.Convert<long>($"{Languages.Display(41)}");
-                    break;
-                default:
-                    Utility.PrintMessage($"{Languages.Display(20)}", false);
-                    goto option;
-            }
+            case (int)MobileChoice.Self:
+                selectedMobileNumber = myMobileNumber;
+                break;
+            case (int)MobileChoice.Others:
+                selectedMobileNumber = Validate.Convert<long>($"{Languages.Display(41)}");
+                break;
+            default:
+                Utility.PrintMessage($"{Languages.Display(20)}", false);
+                goto option;
         }
     }
     public void ValidateAirtime()
@@ -216,22 +194,11 @@ internal partial class Atm
 
     public void OptionAirtime(decimal airtimeAmount)
     {
-        using (SqlConnection connect = new(connectionString))
+        if (airtimeAmount >= accountBalance)
         {
-            string query = @"SELECT balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            decimal balance = (decimal)command.ExecuteScalar();
-
-            if (airtimeAmount >= balance)
-            {
-                Utility.PrintMessage($"{Languages.Display(21)}", false);
-                Utility.PressEnterToContinue();
-                return;
-            }
+            Utility.PrintMessage($"{Languages.Display(21)}", false);
+            Utility.PressEnterToContinue();
+            return;
         }
         RechargeMessage(airtimeAmount);
     }
@@ -246,30 +213,20 @@ internal partial class Atm
             goto startRecharge;
         }
 
-        if (otherRechargeAmount > 20000)
+        if (otherRechargeAmount > maximumRechargeAmount)
         {
-            Utility.PrintMessage($"{Languages.Display(43)} {Utility.FormatCurrency(20000)} {Languages.Display(44)}", false);
+            Utility.PrintMessage($"{Languages.Display(43)} {Utility.FormatCurrency(maximumRechargeAmount)} {Languages.Display(44)}", false);
             Thread.Sleep(2000);
             goto startRecharge;
         }
 
-        using (SqlConnection connect = new(connectionString))
+        if (otherRechargeAmount >= accountBalance)
         {
-            string query = @"SELECT balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            decimal balance = (decimal)command.ExecuteScalar();
-
-            if (otherRechargeAmount >= balance)
-            {
-                Utility.PrintMessage($"{Languages.Display(21)}", false);
-                Utility.PressEnterToContinue();
-                return;
-            }
+            Utility.PrintMessage($"{Languages.Display(21)}", false);
+            Utility.PressEnterToContinue();
+            return;
         }
+
         RechargeMessage(otherRechargeAmount);
     }
 
@@ -295,60 +252,79 @@ internal partial class Atm
         Utility.PrintMessage($"{Languages.Display(47)} : {selectedMobileNumber} {Languages.Display(48)} {Utility.FormatCurrency(amount)} {Languages.Display(49)}", true);
         Utility.PressEnterToContinue();
 
+        string update = @$"UPDATE customers SET Balance -= {amount} WHERE customer_id = {selectedId}";
+
+        string insert = @$"INSERT INTO transactionTracker(Customer_Id, Transaction_Type, Transaction_Amount, Transaction_Date, Description) VALUES
+                           ({selectedId}, '{Languages.Display(90)}', {Utility.FormatCurrency(amount)}, CURRENT_TIMESTAMP, '{Languages.Display(55)}')";
+        
         using (SqlConnection connect = new(connectionString))
         {
-            string query = @"UPDATE balance FROM ATMCARD
-                             SET balance -= amount 
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
             connect.Open();
-            command.ExecuteNonQuery();
-        }
+            using (SqlCommand command = new(update, connect))
+            {
+                command.ExecuteNonQuery();
+            }
 
-        //InsertTransaction(UserData.selectedAccount.Id, $"{Languages.Display(90)}", Utility.FormatCurrency(rechargeAmount), $"{Languages.Display(55)}");
+            using (SqlCommand command = new(insert, connect))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
     }
 
-    public void InsertTransaction(int userBankAccountId, string transactionType, string amount, string description)
+    public void InsertTransaction()
     {
-        var tracker = new TransactionTracker
+        string getId = @$"SELECT * FROM transactionTracker
+                          WHERE Customer_Id = {selectedId}";
+
+        using (SqlConnection connect = new(connectionString))
         {
-            TransactionId = Utility.GenerateTransactionId(),
-            UserBankAccountId = userBankAccountId,
-            TransactionType = transactionType,
-            TransactionAmount = amount,
-            TransactionDate = DateTime.Now,
-            Description = description
-        };
-        //UserData.TransactionTrackerList.Add(tracker);
+            using (SqlCommand command = new(getId, connect))
+            {
+                connect.Open();
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        var transactionList = new TransactionTracker
+                        {
+                            TransactionId = (long)reader["Transaction_Id"],
+                            UserBankAccountId = (long)reader["Customer_Id"],
+                            TransactionType = (string)reader["Transaction_Type"],
+                            TransactionAmount = (decimal)reader["Transaction_Amount"],
+                            TransactionDate = (DateTime)reader["Transaction_Date"],
+                            Description = (string)reader["Description"]
+                        };
+                        TransactionTrackerList.Add(transactionList);
+                    }
+                    else                    
+                        Utility.PrintMessage($"{Languages.Display(62)}", false);
+                }
+            }
+        }
     }
 
     public void ViewTransaction()
     {
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.DarkBlue;
-        /*var filteredList = from list in UserData.TransactionTrackerList
-                           where list.UserBankAccountId == UserData.selectedAccount.Id
-                           select list;
 
-        var count = filteredList.Count();
+        InsertTransaction();
 
-        if (count > 0)
+        if (TransactionTrackerList?.Count > 0)
         {
             ConsoleTable table = new(Languages.Display(56), Languages.Display(57), Languages.Display(58), Languages.Display(59), Languages.Display(60));
 
-            foreach (var display in filteredList)
+            foreach (var display in TransactionTrackerList)
             {
                 table.AddRow(display.TransactionId, display.TransactionDate, display.TransactionType, display.TransactionAmount, display.Description);
             }
             table.Options.EnableCount = false;
             table.Write();
 
-            Utility.PrintMessage($"{Languages.Display(61)} : {count}", true);
+            Utility.PrintMessage($"{Languages.Display(61)} : {TransactionTrackerList?.Count}", true);
         }
-        else
-            Utility.PrintMessage($"{Languages.Display(62)}", false);
 
-        Utility.PressEnterToContinue();*/
+        Utility.PressEnterToContinue();
     }
 }

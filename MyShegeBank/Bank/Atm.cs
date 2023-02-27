@@ -11,14 +11,29 @@ namespace ShegeBank.Bank;
 internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
 {
     string connectionString = ConfigurationManager.ConnectionStrings["DATA"].ConnectionString;
-    int selectedId;
-    int totalLogin;
+    static long selectedId;
+    static string? locked;
+    static int cardPin;
+    static string? firstName;
+    static string? lastName;
+    static int totalLogin;
+    static long myMobileNumber;
+    static long myAccountNumber;
+    static decimal accountBalance;
 
-    private decimal maximumWithdrawalAmount = 40000;
+    private readonly decimal maximumWithdrawalAmount = 20000;
+    private readonly decimal minimumAccountBalance = 500;
     public void ValidateCardNumberAndPassword()
     {
         bool login = false;
         long cardNumber = Validate.Convert<long>("Enter your card number[Insert your ATM Card]");
+
+        string getData = @$"SELECT Customer_Id, Is_Locked, Card_Pin, Total_Login, First_Name, Last_Name, Mobile_Number,
+                          Account_Number, Balance FROM customers WHERE Card_Number = {cardNumber}";
+
+        string update = @$"
+                           UPDATE customers SET Total_Login = {totalLogin} WHERE Customer_Id = {selectedId};
+                           UPDATE customers SET Is_Locked = 'true' WHERE Customer_Id = {selectedId};";
 
         while (login == false)
         {
@@ -26,73 +41,51 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
 
             using (SqlConnection connect = new(connectionString))
             {
-                string query = @"SELECT customer_id FROM ATMCARD
-                                 WHERE card_number = cardNumber";
-                /*try
-                {*/
-                    SqlCommand command = new(query, connect);
-                    connect.Open();
-
-                    selectedId = (int)command.ExecuteScalar();
-                //}
-                /*catch
+                using (SqlCommand command = new(getData, connect))
                 {
-                    Utility.PrintMessage("Your ATM card is invalid..[ATM card no dey valid]..[ATM anabataro card gi]", false);
-                    Thread.Sleep(4000);
-                    Pick.Cancel();
-                    login = true;
-                    break;
-                }*/
+                    connect.Open();
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            locked = (string)reader["Is_Locked"];
+                            selectedId = (long)reader["Customer_Id"];
+                            cardPin = (int)reader["Card_Pin"];
+                            totalLogin = (int)reader["Total_Login"];
+                            firstName = (string)reader["First_Name"];
+                            lastName = (string)reader["Last_Name"];
+                            myMobileNumber = (long)reader["Mobile_Number"];
+                            myAccountNumber = (long)reader["Account_Number"];
+                            accountBalance = (decimal)reader["Balance"];
+                        }
+                        else
+                        {
+                            Utility.PrintMessage("Your ATM card is invalid..[ATM card no dey valid]..[ATM anabataro card gi]", false);
+                            Thread.Sleep(4000);
+                            Pick.Cancel();
+                            login = true;
+                            break;
+                        }
+                    }
+                }
 
-            }
-
-            using (SqlConnection connect = new(connectionString))
-            {
-                string query = @"SELECT is_locked FROM ATMCARD
-                                 WHERE selectedId == customer_id";
-
-                SqlCommand command = new(query, connect);
-                connect.Open();
-
-                bool isLocked = (bool)command.ExecuteScalar();
-
-                if (isLocked == true)
+                if (locked == "true")
                 {
                     UserScreen.LockedAccount();
                     login = true;
                     break;
                 }
 
-            }
+                Languages.ValidateLanguageChoice();
 
-            Languages.ValidateLanguageChoice();
-
-            inputPin: int pin = Utility.GetUserPin($"{Languages.Display(4)}");
-
-            using (SqlConnection connect = new(connectionString))
-            {
-                string query = @"SELECT card_pin FROM ATMCARD
-                                 WHERE selectedId == customer_id";
-
-                SqlCommand command = new(query, connect);
-                connect.Open();
-
-                int cardPin = (int)command.ExecuteScalar();
-
-                string getFullName = @"SELECT full_name FROM ATMCARD
-                                       WHERE selectedId == customer_id";
-
-                SqlCommand name = new(getFullName, connect);
-                connect.Open();
-                string fullName = (string)command.ExecuteScalar();
+                inputPin: int pin = Utility.GetUserPin($"{Languages.Display(4)}");
 
                 if (pin == cardPin)
                 {
                     Utility.Loading($"{Languages.Display(5)}", ".", 6, 500);
 
-                    Utility.PrintMessage($"Hello {fullName}, welcome back...[Nnoo]", true);
+                    Utility.PrintMessage($"Hello {firstName} {lastName}, welcome back...[Nnoo]", true);
                     Thread.Sleep(2000);
-                    totalLogin = 0;
                     login = true;
                     break;
                 }
@@ -110,40 +103,26 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
                     if (totalLogin == 3)
                     {
                         Thread.Sleep(2000);
-                        string update = @"UPDATE ATMCARD
-                                          SET is_locked == true
-                                          WHERE selectedId == customer_id";
-
-                        SqlCommand updated = new(update, connect);
-
-                        command.ExecuteNonQuery();
+                        using (SqlCommand command = new(update, connect))
+                        {
+                            command.ExecuteNonQuery();
+                        }
                         UserScreen.LockAccount();
                         login = true;
                         break;
                     }
                     goto inputPin;
                 }
-            }
+            }            
         }
     }
     public void CheckBalance()
     {
-        decimal accountBalance;
         Console.ForegroundColor = ConsoleColor.Blue;
         Utility.Loading($"{Languages.Display(5)}", ".", 6, 500);
 
-        using (SqlConnection connect = new(connectionString))
-        {
-            string query = @"SELECT balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            accountBalance = (decimal)command.ExecuteScalar();
-        }
-
         Console.WriteLine($"| {Languages.Display(8)} : {Utility.FormatCurrency(accountBalance)} |");
+
         Utility.PressEnterToContinue();
     }
     public void Deposit()
@@ -194,20 +173,26 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
 
         Utility.PrintMessage($"{Languages.Display(17)} {Utility.FormatCurrency(depositAmount)} {Languages.Display(18)}", true);
 
+        string update = @$"UPDATE customers SET Balance += {depositAmount} WHERE Customer_Id = {selectedId}";
+
+        string insert = @$"INSERT INTO transactionTracker(Customer_Id, Transaction_Type, Transaction_Amount, Transaction_Date, Description) VALUES
+                           ({selectedId}, '{Languages.Display(87)}', {Utility.FormatCurrency(depositAmount)}, CURRENT_TIMESTAMP, '{Languages.Display(50)}')";
+
         using (SqlConnection connect = new(connectionString))
         {
-            string query = @"UPDATE ATMCARD
-                             SET balance += depositAmount 
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
             connect.Open();
-            command.ExecuteNonQuery();
+            using (SqlCommand command = new(update, connect))
+            {
+                command.ExecuteNonQuery();
+            }
+
+            using (SqlCommand command = new(insert, connect))
+            {
+                command.ExecuteNonQuery();
+            }
         }
 
         Utility.PressEnterToContinue();
-
-        //InsertTransaction(UserData.selectedAccount.Id, $"{Languages.Display(87)}", Utility.FormatCurrency(depositAmount), $"{Languages.Display(50)}");
     }
     public void Withdrawal()
     {
@@ -249,24 +234,12 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
     }
     public void OptionWithdrawal(decimal withdrawalAmount)
     {
-        using (SqlConnection connect = new(connectionString))
+        if (withdrawalAmount >= (accountBalance - minimumAccountBalance))
         {
-            string query = @"SELECT withdrawable_balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            decimal withdrawableBalance = (decimal)command.ExecuteScalar();
-
-            if (withdrawalAmount >= withdrawableBalance)
-            {
-                Utility.PrintMessage($"{Languages.Display(21)}", false);
-                Utility.PressEnterToContinue();
-                return;
-            }
+            Utility.PrintMessage($"{Languages.Display(21)}", false);
+            Utility.PressEnterToContinue();
+            return;
         }
-
         WithdrawalMessage(withdrawalAmount);
     }
     public void OtherWithdrawal()
@@ -285,22 +258,11 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
             goto startWithdrawal;
         }
 
-        using (SqlConnection connect = new(connectionString))
+        if (otherWithdrawalAmount >= (accountBalance - minimumAccountBalance))
         {
-            string query = @"SELECT withdrawable_balance FROM ATMCARD
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
-            connect.Open();
-
-            decimal withdrawableBalance = (decimal)command.ExecuteScalar();
-
-            if (otherWithdrawalAmount >= withdrawableBalance)
-            {
-                Utility.PrintMessage($"{Languages.Display(21)}", false);
-                Utility.PressEnterToContinue();
-                return;
-            }
+            Utility.PrintMessage($"{Languages.Display(21)}", false);
+            Utility.PressEnterToContinue();
+            return;
         }
 
         if (otherWithdrawalAmount > maximumWithdrawalAmount)
@@ -322,17 +284,23 @@ internal partial class Atm : IUserLogin, IUserMainOptions, ITrackTransaction
         Utility.PrintMessage($"{Languages.Display(29)}", true);
         Thread.Sleep(4000);
 
+        string update = @$"UPDATE customers SET Balance -= {amount} WHERE Customer_Id = {selectedId}";
+
+        string insert = $@"INSERT INTO transactionTracker(Customer_Id, Transaction_Type, Transaction_Amount, Transaction_Date, Description) VALUES
+                           ({selectedId}, '{Languages.Display(88)}', {Utility.FormatCurrency(amount)}, CURRENT_TIMESTAMP, '{Languages.Display(51)}');";
+
         using (SqlConnection connect = new(connectionString))
         {
-            string query = @"UPDATE ATMCARD
-                             SET balance -= amount 
-                             WHERE selectedId == customer_id";
-
-            SqlCommand command = new(query, connect);
             connect.Open();
-            command.ExecuteNonQuery();
-        }
+            using (SqlCommand command = new(update, connect))
+            {
+                command.ExecuteNonQuery();
+            }
 
-        //InsertTransaction(UserData.selectedAccount.Id, $"{Languages.Display(88)}", Utility.FormatCurrency(amount), $"{Languages.Display(51)}");
+            using (SqlCommand command = new(insert, connect))
+            {
+                command.ExecuteNonQuery();
+            }
+        }
     }
-} 
+}

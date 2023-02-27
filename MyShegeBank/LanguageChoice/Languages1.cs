@@ -4,7 +4,7 @@ namespace ShegeBank.LanguageChoice;
 
 internal partial class Languages
 {
-    public static string[,] language = new string[3, 91]
+    public static string[,] language = new string[3, 92]
     {
         //English Language
         {
@@ -143,7 +143,10 @@ internal partial class Languages
             "Deposit", //--87
             "Withdrawal",
             "Transfer",
-            "Airtime"
+            "Airtime",
+
+            //Atm1.cs/ValidateTransfer
+            "Transfer failed...please try again"
         },
 
         //Broken English Language
@@ -283,7 +286,10 @@ internal partial class Languages
             "Put Moni",
             "Commot Moni",
             "Send Moni",
-            "Load Card"
+            "Load Card",
+
+            //Atm1.cs/ValidateTransfer
+            "Transfer no go...abeg try again"
         },
 
         //Igbo Language
@@ -423,7 +429,10 @@ internal partial class Languages
             "Tinye Ego",
             "Were Ego",
             "Ziga Ego",
-            "Ego Ekwenti"
+            "Ego Ekwenti",
+
+            //Atm1.cs/ValidateTransfer
+            "Ego ezigara agahi...biko ziga ya ozo"
         }
     };
 }

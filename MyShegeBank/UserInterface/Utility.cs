@@ -98,10 +98,4 @@ internal class Utility
     {
         return String.Format(culture, "{0:c2}", amount);
     }
-
-    private static long generateTransactionId;
-    public static long GenerateTransactionId()
-    {
-        return ++generateTransactionId;
-    }
 }
