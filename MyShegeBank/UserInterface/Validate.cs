@@ -20,7 +20,6 @@ internal class Validate
                 if (converter != null)
                     return (T)converter.ConvertFromString(userInput);
                 else
-                   
                     return default;
             }
             catch

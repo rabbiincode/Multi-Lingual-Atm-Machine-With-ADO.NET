@@ -4,9 +4,9 @@ namespace ShegeBank
 {
     internal class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            ALwaysOnScreen.Display();
+            await ALwaysOnScreen.DisplayAsync();
         }
     }
 }

@@ -2,9 +2,9 @@
 
 public interface IUserMainOptions
 {
-    void CheckBalance();
-    void Deposit();
-    void Withdrawal();
-    void Transfer();
-    void Airtime();
+    Task CheckBalanceAsync();
+    Task DepositAsync();
+    Task WithdrawalAsync();
+    Task TransferAsync();
+    Task AirtimeAsync();
 }

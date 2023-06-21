@@ -22,7 +22,7 @@ internal class UserData
                               ('Pearl', 'Wright', NULL, 'F', 2590687544, 0812350867, '70 Main Street', 10900, 671063, 7777, 0, 'false', 2),
                               ('Vicent', 'Tryle', 'Boss', 'M', 2400093255, 0904876631, '4 Grid Layout', 7000, 598991, 8889, 0, 'false', 7),
                               ('Robin', 'Hinett', 'Voice', 'M', 2311098455, 0914560832, '29 Busy Street Layout', 170000, 111660, 3059, 0, 'false', 3);";
-    public void InsertTableData()
+    public async Task InsertTableDataAsync()
     {
         try
         {
@@ -31,11 +31,11 @@ internal class UserData
                 connect.Open();
                 using (SqlCommand insertBranch = new(branch, connect))
                 {
-                    insertBranch.ExecuteNonQuery();
+                    await insertBranch.ExecuteNonQueryAsync();
                 }
                 using (SqlCommand insertCustomer = new(customer, connect))
                 {
-                    insertCustomer.ExecuteNonQuery();
+                    await insertCustomer.ExecuteNonQueryAsync();
                 }  
             }
         }

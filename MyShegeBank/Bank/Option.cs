@@ -1,44 +1,45 @@
-﻿using ShegeBank.Enum;
+﻿using ShegeBank.Bank;
+using ShegeBank.Enum;
 using ShegeBank.LanguageChoice;
 using ShegeBank.UserInterface;
 
-namespace ShegeBank.Bank.AtmFunctionality;
+namespace MyShegeBank.Bank;
 internal class Option
 {
-    public static void UserInput()
+    public static async Task UserInputAsync()
     {
-        Atm atm= new();
+        Atm atm = new();
 
         start: int input = Validate.Convert<int>($"{Languages.Display(63)}");
 
         switch (input)
         {
             case (int)UserChoice.CheckBalance:
-                atm.CheckBalance();
-                Pick.Question();
+                await atm.CheckBalanceAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.Deposit:
-                atm.Deposit();
-                Pick.Question();
+                await atm.DepositAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.Withdrawal:
-                atm.Withdrawal();
-                Pick.Question();
+                await atm.WithdrawalAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.Transfer:
-                atm.Transfer();
-                Pick.Question();
+                await atm.TransferAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.Airtime:
-                atm.Airtime();
-                Pick.Question();
+                await atm.AirtimeAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.TransactionHistory:
-                atm.ViewTransaction();
-                Pick.Question();
+                await atm.ViewTransactionAsync();
+                await Pick.QuestionAsync();
                 break;
             case (int)UserChoice.Cancel:
-                Pick.Question();
+                await Pick.QuestionAsync();
                 break;
             default:
                 Utility.PrintMessage($"{Languages.Display(3)}", false);

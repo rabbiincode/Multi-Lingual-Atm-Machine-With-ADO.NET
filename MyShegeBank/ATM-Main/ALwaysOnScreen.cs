@@ -6,13 +6,13 @@ namespace ShegeBank.ATM_Main;
 
 internal class ALwaysOnScreen
 {
-    internal static void Display()
+    internal static async Task DisplayAsync()
     {
         Atm atm = new();
         CreateDatabase database = new();
-        database.CreateDataBase();
+        await database.CreateDataBaseAsync();
         UserScreen.Welcome();
-        atm.ValidateCardNumberAndPassword();
-        UserScreen.DisplayAtmMenu();
+        await atm.ValidateCardNumberAndPasswordAsync();
+        await UserScreen.DisplayAtmMenuAsync();
     }
 }

@@ -12,6 +12,7 @@ internal class Admin
                                   Branch_Id INT PRIMARY KEY IDENTITY(1,1),
                                   Branch_Address VARCHAR(50) NOT NULL,
                                )";
+
     readonly string customer = @"CREATE TABLE customers(
                                     Customer_Id BIGINT PRIMARY KEY IDENTITY(1,1),
                                     First_Name VARCHAR(30) NOT NULL,
@@ -21,7 +22,7 @@ internal class Admin
                                     Account_Number BIGINT UNIQUE,
                                     Mobile_Number BIGINT NOT NULL,
                                     Address VARCHAR(50) NOT NULL,
-                                    Balance DECIMAL,
+                                    Balance DECIMAL(18,2) NOT NULL,
                                     Card_Number BIGINT UNIQUE,
                                     Card_Pin INT,
                                     Total_Login INT NOT NULL,
@@ -29,37 +30,38 @@ internal class Admin
                                     Account_Branch_Id INT,
                                     FOREIGN KEY (Account_Branch_Id) REFERENCES branch(Branch_Id) ON DELETE SET NULL
                                  )";
+
     readonly string transactionsTracker = @"CREATE TABLE transactionTracker(
                                                Transaction_Id BIGINT PRIMARY KEY IDENTITY(1,1),
                                                Customer_Id BIGINT,
                                                Transaction_Type VARCHAR(20) NOT NULL,
                                                Transaction_Amount DECIMAL,
-                                               Transaction_Date DATETIME NOT NULL,
+                                               Transaction_Date DATETIME DEFAULT CURRENT_TIMESTAMP,
                                                Description VARCHAR(50) NOT NULL,
                                                FOREIGN KEY (Customer_Id) REFERENCES customers(Customer_Id) ON DELETE SET NULL
                                             )";
-    public void CreateDatabaseAndTables()
+    public async Task CreateDatabaseAndTablesAsync()
     {
         using (SqlConnection connect = new(connectionString))
         {
             try
             {
                 connect.Open();
-                using (SqlCommand createDatabase = new(database, connect))
+              /*  using (SqlCommand createDatabase = new(database, connect))
                 {
-                    createDatabase.ExecuteNonQuery();
-                }
+                    await createDatabase.ExecuteNonQueryAsync();
+                }*/
                 using (SqlCommand createBranch = new(branch, connect))
                 {
                     createBranch.ExecuteNonQuery();
                 }
                 using (SqlCommand createCustomer = new(customer, connect))
                 {
-                    createCustomer.ExecuteNonQuery();
+                    await createCustomer.ExecuteNonQueryAsync();
                 }
                 using (SqlCommand createTransactionsTracker = new(transactionsTracker, connect))
                 {
-                    createTransactionsTracker.ExecuteNonQuery();
+                    await createTransactionsTracker.ExecuteNonQueryAsync();
                 }
             }
             catch

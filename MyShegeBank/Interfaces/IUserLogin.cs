@@ -2,5 +2,5 @@
 
 public interface IUserLogin
 {
-    void ValidateCardNumberAndPassword();
+    Task ValidateCardNumberAndPasswordAsync();
 }

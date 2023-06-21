@@ -7,9 +7,9 @@ internal class CreateDatabase
     Admin admin = new();
     UserData userData = new();
 
-    public void CreateDataBase()
+    public async Task CreateDataBaseAsync()
     {
-        admin.CreateDatabaseAndTables();
-        userData.InsertTableData();
+        await admin.CreateDatabaseAndTablesAsync();
+        await userData.InsertTableDataAsync();
     }
 }

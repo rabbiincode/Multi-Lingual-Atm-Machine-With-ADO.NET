@@ -16,12 +16,12 @@ internal partial class Atm
     static long selectedMobileNumber;
     private readonly decimal maximumRechargeAmount = 20000;
     private List<TransactionTracker> TransactionTrackerList = new List<TransactionTracker>();
-    public void Transfer()
+    public async Task TransferAsync()
     {
-        ValidateTransfer();
+        await ValidateTransferAsync();
     }
 
-    public void ValidateTransfer()
+    public async Task ValidateTransferAsync()
     {
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Blue;
@@ -30,7 +30,7 @@ internal partial class Atm
         if (transferAmount <= 0)
         {
             Utility.PrintMessage($"{Languages.Display(23)}", false);
-            Thread.Sleep(4000);
+            await Task.Delay(4000);
             goto transfer;
         }
 
@@ -49,7 +49,7 @@ internal partial class Atm
         if (myAccountNumber == receiverAccountNumber)
         {
             Utility.PrintMessage($"{Languages.Display(33)}", false);
-            Thread.Sleep(2000);
+            await Task.Delay(2000);
             goto startTransfer;
         }
 
@@ -58,7 +58,7 @@ internal partial class Atm
             using (SqlCommand command = new(query, connect))
             {
                 connect.Open();
-                using (SqlDataReader reader = command.ExecuteReader())
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
                 {
                     if (reader.Read())
                     {
@@ -70,14 +70,14 @@ internal partial class Atm
                     else
                     {
                         Utility.PrintMessage($"{Languages.Display(32)}", false);
-                        Thread.Sleep(2000);
+                        await Task.Delay(2000);
                         goto startTransfer;
                     }
                 }
             }
         }
 
-        Utility.Loading($"{Languages.Display(34)}", ".", 7, 500);
+        await Utility.LoadingAsync($"{Languages.Display(34)}", ".", 7, 500);
 
         Console.WriteLine($"{Languages.Display(35)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(36)} {receiverFirstName} {receiverLastName}");
 
@@ -92,7 +92,7 @@ internal partial class Atm
             goto question;
         }
 
-        Utility.Loading($"{Languages.Display(5)}", ".", 6, 400);
+        await Utility.LoadingAsync($"{Languages.Display(5)}", ".", 6, 400);
 
         //update senders and reciever's balance
         string updateBalance = @$"
@@ -117,7 +117,7 @@ internal partial class Atm
             {
                 using (SqlCommand command = new(updateBalance, connect, transaction))
                 {
-                    command.ExecuteNonQuery();
+                    await command.ExecuteNonQueryAsync();
                     transaction.Commit();
                 }
                 Utility.PrintMessage($"{Languages.Display(38)} {Utility.FormatCurrency(transferAmount)} {Languages.Display(39)} {receiverFirstName} {receiverLastName} {Languages.Display(40)}", true);
@@ -141,11 +141,11 @@ internal partial class Atm
         }
         Utility.PressEnterToContinue();
     }
-    public void Airtime()
+    public async Task AirtimeAsync()
     {
         MobileNumberChoice();
         UserScreen.AirtimeOption();
-        ValidateAirtime();
+        await ValidateAirtimeAsync();
     }
 
     public void MobileNumberChoice()
@@ -166,33 +166,33 @@ internal partial class Atm
                 goto option;
         }
     }
-    public void ValidateAirtime()
+    public async Task ValidateAirtimeAsync()
     {
         option: int airtimeOption = Validate.Convert<int>($"{Languages.Display(19)}");
 
         switch (airtimeOption)
         {
             case (int)Recharge.TwoHundred:
-                OptionAirtime(200);
+                await OptionAirtimeAsync(200);
                 break;
             case (int)Recharge.FiveHundred:
-                OptionAirtime(500);
+                await OptionAirtimeAsync(500);
                 break;
             case (int)Recharge.OneThousand:
-                OptionAirtime(1000);
+                await OptionAirtimeAsync(1000);
                 break;
             case (int)Recharge.TwoThousand:
-                OptionAirtime(2000);
+                await OptionAirtimeAsync(2000);
                 break;
             case (int)Recharge.Others:
-                OtherAirtime();
+                await OtherAirtimeAsync();
                 break;
             default:
                 goto option;
         }
     }
 
-    public void OptionAirtime(decimal airtimeAmount)
+    public async Task OptionAirtimeAsync(decimal airtimeAmount)
     {
         if (airtimeAmount >= accountBalance)
         {
@@ -200,23 +200,23 @@ internal partial class Atm
             Utility.PressEnterToContinue();
             return;
         }
-        RechargeMessage(airtimeAmount);
+        await RechargeMessageAsync(airtimeAmount);
     }
-    public void OtherAirtime()
+    public async Task OtherAirtimeAsync()
     {
         startRecharge: int otherRechargeAmount = Validate.Convert<int>($"{Languages.Display(42)}");
 
         if (otherRechargeAmount <= 0)
         {
             Utility.PrintMessage($"{Languages.Display(23)}", false);
-            Thread.Sleep(2000);
+            await Task.Delay(2000);
             goto startRecharge;
         }
 
         if (otherRechargeAmount > maximumRechargeAmount)
         {
             Utility.PrintMessage($"{Languages.Display(43)} {Utility.FormatCurrency(maximumRechargeAmount)} {Languages.Display(44)}", false);
-            Thread.Sleep(2000);
+            await Task.Delay(2000);
             goto startRecharge;
         }
 
@@ -227,15 +227,15 @@ internal partial class Atm
             return;
         }
 
-        RechargeMessage(otherRechargeAmount);
+        await RechargeMessageAsync(otherRechargeAmount);
     }
 
-    public void RechargeMessage(decimal amount)
+    public async Task RechargeMessageAsync(decimal amount)
     {
-        Utility.Loading($"{Languages.Display(5)}", ".", 6, 500);
+        await Utility.LoadingAsync($"{Languages.Display(5)}", ".", 6, 500);
 
         Console.WriteLine($"{Languages.Display(45)} : {selectedMobileNumber} {Languages.Display(46)} {Utility.FormatCurrency(amount)}");
-        Thread.Sleep(3000);
+        await Task.Delay(3000);
 
         question: int answer = Validate.Convert<int>($"{Languages.Display(37)}");
 
@@ -248,7 +248,7 @@ internal partial class Atm
             goto question;
         }
 
-        Utility.Loading("", "", 5, 500);
+        await Utility.LoadingAsync("", "", 5, 500);
         Utility.PrintMessage($"{Languages.Display(47)} : {selectedMobileNumber} {Languages.Display(48)} {Utility.FormatCurrency(amount)} {Languages.Display(49)}", true);
         Utility.PressEnterToContinue();
 
@@ -262,7 +262,7 @@ internal partial class Atm
             connect.Open();
             using (SqlCommand command = new(update, connect))
             {
-                command.ExecuteNonQuery();
+                await command.ExecuteNonQueryAsync();
             }
 
             using (SqlCommand command = new(insert, connect))
@@ -272,7 +272,7 @@ internal partial class Atm
         }
     }
 
-    public void InsertTransaction()
+    public async Task InsertTransactionAsync()
     {
         string getId = @$"SELECT * FROM transactionTracker
                           WHERE Customer_Id = {selectedId}";
@@ -282,7 +282,7 @@ internal partial class Atm
             using (SqlCommand command = new(getId, connect))
             {
                 connect.Open();
-                using (SqlDataReader reader = command.ExecuteReader())
+                using (SqlDataReader reader = await command.ExecuteReaderAsync())
                 {
                     if (reader.Read())
                     {
@@ -304,12 +304,12 @@ internal partial class Atm
         }
     }
 
-    public void ViewTransaction()
+    public async Task ViewTransactionAsync()
     {
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.DarkBlue;
 
-        InsertTransaction();
+        await InsertTransactionAsync();
 
         if (TransactionTrackerList?.Count > 0)
         {

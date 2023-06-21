@@ -1,5 +1,5 @@
-﻿using ShegeBank.ATM_Main;
-using ShegeBank.Bank.AtmFunctionality;
+﻿using MyShegeBank.Bank;
+using ShegeBank.ATM_Main;
 using ShegeBank.LanguageChoice;
 
 namespace ShegeBank.UserInterface;
@@ -16,24 +16,24 @@ internal class UserScreen
         Console.Write($"\nPress Enter to Continue...[Pia Enter obuna ichoro e ga n'iru]");
         Console.ReadLine();
     }
-    internal static void LockAccount()
+    internal static async Task LockAccountAsync()
     {
         Console.Clear();
-        Utility.Loading($"{Languages.Display(68)}", "<<<>>>", 6, 400);
+        await Utility.LoadingAsync($"{Languages.Display(68)}", "<<<>>>", 6, 400);
         Utility.PrintMessage($"{Languages.Display(69)}", false);
         Utility.PressEnterToContinue();
         Utility.PrintMessage($"{Languages.Display(70)}", false);
-        Utility.Loading("", "-_-", 6, 400);
-        ALwaysOnScreen.Display();
+        await Utility.LoadingAsync("", "-_-", 6, 400);
+        await ALwaysOnScreen.DisplayAsync();
     }
 
-    internal static void LockedAccount()
+    internal static async Task LockedAccountAsync()
     {
         Utility.PrintMessage(">Your account has been suspended... visit our nearest branch for futher information and actions...\n" +
                           "\n>>[Ya account don dey locked... go we closest office make we for open am]...\n" +
                           "\n>>>[Anyi akpochigo accounti gi... ga ulo oru anyi ebe ka gi nso ka anyi kponye ya]", false);
         Utility.PressEnterToContinue();
-        Pick.Cancel();
+        await Pick.CancelAsync();
     }
     internal static void AtmMenu()
     {
@@ -52,10 +52,10 @@ internal class UserScreen
         Utility.PrintMessage($"~~~~~~~~~~~~~~~~~~~~~~{Languages.Display(79)}~~~~~~~~~~~", true);
     }
 
-    internal static void DisplayAtmMenu()
+    internal static async Task DisplayAtmMenuAsync()
     {
         AtmMenu();
-        Option.UserInput();
+        await Option.UserInputAsync();
     }
     public static void WithdrawalOption()
     {

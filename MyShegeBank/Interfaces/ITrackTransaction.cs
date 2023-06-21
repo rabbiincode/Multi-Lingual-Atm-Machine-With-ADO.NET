@@ -2,6 +2,6 @@
 
 public interface ITrackTransaction
 {
-    void InsertTransaction();
-    void ViewTransaction();
+    Task InsertTransactionAsync();
+    Task ViewTransactionAsync();
 }

@@ -82,13 +82,13 @@ internal class Utility
        
     }
 
-    public static void Loading(string holdOn, string load, int count, int timer)
+    public static async Task LoadingAsync(string holdOn, string load, int count, int timer)
     {
         Console.Write($"\n{holdOn}");
         for (int i = 0; i < count; i++)
         {
             Console.Write($"{load}");
-            Thread.Sleep(timer);
+            await Task.Delay(timer);
         }
         Console.Clear();
     }
